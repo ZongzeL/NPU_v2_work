@@ -1,0 +1,13 @@
+Difference with v4.1:
+1. vmm need a trigger command, not automatically trigger.
+2. vmm input data array is not limited for one round.
+3. allow write vmm input data array anytime except DAC state
+4. allow read vmm output data array anytime except ADC state
+5. 
+
+change:
+1. NPU wrap config memory size from 16 to 32
+2. make NPU wrap config memory 16 as vmm start.
+3. remove vmm input indexer and counter
+4. 
+
