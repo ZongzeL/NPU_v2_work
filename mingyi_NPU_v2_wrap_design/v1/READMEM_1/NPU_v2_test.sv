@@ -185,8 +185,8 @@ module NPU_v2_wrap_mingyi_tb #(
     localparam BL_ST = 0;
     localparam BL_END = 7;
     localparam L0_single_point_opt_loop = 0;
-    localparam L1_single_point_loop = 0;
-    localparam L4_whole_range_loop = 0;
+    localparam L1_single_point_loop = 1;
+    localparam L4_whole_range_loop = 1;
 
  
 
@@ -393,12 +393,8 @@ begin
     input_list[13][23:16] = 8'hf3; //reset_srref2
 
     //14
-    //input_list[14][1 : 0] = 2'h1; //RUN_RESET
-    input_list[14][1 : 0] = 2'h0; //RUN_RESET
-    input_list[14][3 : 2] = 2'h2; //RUN_SET
-    input_list[14][5 : 4] = 2'h1; //READMEM
-    //input_list[14][7 : 6] = 2'h2; 
-    input_list[14][18:16] = 3'd2; //L0_single_point_opt_loop
+    input_list[14][1 : 0] = 2'h2; //READMEM
+    input_list[14][18:16] = 3'd0; //L0_single_point_opt_loop
 
     //15
     input_list[15][31: 0] = L1_single_point_loop;
@@ -414,10 +410,11 @@ begin
     input_list[18][31:16] = 16'd0; //NPU_WRAP_SEL_pulsewidth_readmem_st
     
     //19
-    input_list[19][31:20] = 8'd40; //adc_first_delay
-    input_list[19][19: 8] = 8'd10; //adc_high_delay
-    input_list[19][7 : 0] = 8'd00; //adc_low_delay
+    input_list[19][31:20] = 8'd50; //adc_first_delay
+    input_list[19][19: 8] = 8'd30; //adc_high_delay
+    input_list[19][7 : 0] = 8'd10; //adc_low_delay
     
+    //input_list[19][31:0] = 32'h10e00a00; //default, comment this to switch different values
 
     //20
     input_list[20][7 : 0] = 8'he1; //set_srref0

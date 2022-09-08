@@ -1,3 +1,4 @@
+`timescale 1 ns / 1 ns
 module top_main #
 (
     // NPU
@@ -148,14 +149,9 @@ module top_main #
                                     din_seldel,   //F_TIABIAS, NaN, F_RSTMAX2, F_SETMAX, F_RSTMAX, F_SELDEL<2:0>, 8'b00000111
                                     din_wldel,    //F_WLDEL<2:0>, 8'b110
                                     din_bldel,    //F_DACBLDEL<2:0>, 8'b110
-                                    DACWL_word,
-                                    DACBL_word,
-                                    DACSEL_word,
                                     batch_size_vmm; //How many vectors to multiply in one VMM call
 
-    wire [15:0] WL_pulsewidth_set_st, WL_pulsewidth_set_end;
-    wire [15:0] BL_pulsewidth_set_st, BL_pulsewidth_set_end;
-    wire [15:0] SEL_pulsewidth_set_st, SEL_pulsewidth_set_end;
+
 
 
     // WL/BL selection registers
@@ -230,14 +226,6 @@ module top_main #
                                     (enable_vmm&&(batch_cunt == (batch_size_vmm - 1)))
                                 || (enable_read && (i_wl == (NUM_WL - 1)))
                                 || (enable_setreset && (i_bl == (NUM_BL - 1))));
-
-    assign WL_pulsewidth_set_st = DACWL_word[15:0];
-    assign WL_pulsewidth_set_end = DACWL_word[31:16];
-    assign BL_pulsewidth_set_st = DACBL_word[15:0];
-    assign BL_pulsewidth_set_end = DACBL_word[31:16];
-    assign SEL_pulsewidth_set_st = DACSEL_word[15:0];
-    assign SEL_pulsewidth_set_end = DACSEL_word[31:16];
-
     //}}}
 
     //Module connection
@@ -261,9 +249,6 @@ module top_main #
         .din_seldel(din_seldel),
         .din_wldel(din_wldel),
         .din_bldel(din_bldel),
-        .DACWL_word(DACWL_word),
-        .DACBL_word(DACBL_word),
-        .DACSEL_word(DACSEL_word),
         .adc_word(adc_word),
         .batch_size(batch_size_vmm),
         .wl_selection(wl_selection),
@@ -454,7 +439,7 @@ module top_main #
                         end else begin
                             curr_state <= curr_state;
                         end
-                    WL_DAC: begin //7
+                    WL_DAC: begin
                         WL_DAC_OUT;
                         if (last_wl_dac) begin
                             curr_state <= ADC_VMM;
@@ -462,7 +447,7 @@ module top_main #
                             curr_state <= curr_state;
                         end
                         end
-                    ADC_VMM: begin //8
+                    ADC_VMM: begin
                         ADC_VMM_OUT;
                         if (last_adc_vmm) begin
                             curr_state <= DATA_SEND;
@@ -669,24 +654,9 @@ module top_main #
     //{{{
     begin
         cnt <= cnt + 1;
-        if (cnt >= BL_pulsewidth_set_st && cnt <= BL_pulsewidth_set_end) begin
-            DACBL_SW <= 1'b1;
-        end
-        else begin
-            DACBL_SW <= 1'b0;
-        end
-        if (cnt >= WL_pulsewidth_set_st && cnt <= WL_pulsewidth_set_end) begin
-            DACWL_SW <= 1'b1;
-        end
-        else begin
-            DACWL_SW <= 1'b0;
-        end
-        if (cnt >= SEL_pulsewidth_set_st && cnt <= SEL_pulsewidth_set_end) begin
-            DACSEL_SW <= 1'b1;
-        end
-        else begin
-            DACSEL_SW <= 1'b0;
-        end
+        DACBL_SW <= 1'b1;
+        DACWL_SW <= 1'b1;
+        DACSEL_SW <= 1'b1;      
         if (mode_sr == 2'b01) // RESET = 10, SET = 01
             SET <= 1'b1;
         else
@@ -720,46 +690,10 @@ module top_main #
                             i_phase && cnt<=(NUM_WL-1),//SEL
                             i_phase && cnt<=(NUM_BL-1),//BL
                             i_phase && cnt<=(NUM_WL-1)};//WL
-                /*
                 DINSWREG <= {cnt<=(NUM_BL-1) &&enable_vmm &&bl_selection[cnt] || cnt==i_bl &&enable_read,
                             cnt<=(NUM_WL-1) &&enable_vmm &&wl_selection[cnt] || cnt==i_wl&&(enable_read||enable_setreset),
                             cnt==(NUM_BL-1-i_bl) &&enable_setreset,
                             cnt<=(NUM_WL-1) &&enable_vmm &&wl_selection[NUM_WL-1-cnt] || cnt==(NUM_WL-1 - i_wl)&&(enable_read||enable_setreset)};
-                */
-
-                DINSWREG[3] <= cnt<=(NUM_BL-1) &&enable_vmm || cnt==i_bl &&enable_read;
-                DINSWREG[2] <= cnt<=(NUM_WL-1) &&enable_vmm &&wl_selection[cnt] || cnt==i_wl&&(enable_read||enable_setreset);
-                DINSWREG[1] <= cnt==(NUM_BL-1-i_bl) &&enable_setreset;
-                DINSWREG[0] <= cnt<=(NUM_WL-1) &&enable_vmm &&wl_selection[NUM_WL-1-cnt] || cnt==(NUM_WL-1 - i_wl)&&(enable_read||enable_setreset);
-
-            /*
-            ARES:
-            注意，这里的 <= 是小于等于
-            3 TIA:
-                用bl，cnt = 0 开0
-                if enable_vmm:
-                    cnt <= (NUM_BL-1)
-                if enable_read:
-                    cnt == i_bl
-            2 SEL: 
-                用wl，cnt = 0 开0
-                if enable_vmm:
-                    (cnt <= (NUM_WL-1)) && wl_selection[cnt]
-                if enable_read || enable_setreset:
-                    cnt = i_wl
-            1 BL:
-                用bl，cnt =0 开255
-                if enable_setreset:
-                    cnt == NUM_BL-1-i_bl
-            0 WL:
-                用wl，cnt = 0 开255
-                if enable_vmm:
-                    NUM_WL-1 && wl_selection[NUM_WL-1-cnt]
-                if enable_read || enable_setreset:
-                    cnt==(NUM_WL-1 - i_wl)
-
-            */
-
             end else begin
                 // CLKREG[0] follows i_phase
                 CLKREG[0] <= i_phase;
@@ -800,10 +734,9 @@ module top_main #
             // The side switches. DACSEL_SW turned on in advance and turned off after all VMM is done
             {DACBL_SW2, DACWL_SW} <=0;
 	    end else begin
-            CLKADCSW <= 1'b1;
 	        DACBL_SW2 <= 1'b1;
-            DACWL_SW <= 1'b1;
-
+	        DACWL_SW <= 1'b1;
+            CLKADCSW <= 1'b1;
 	        if (bl_selection[cnt]) begin
                 if (cnt_adc_first_delay == adc_first_delay) begin  
                     cnt <= cnt + (i_phase==adc_high_period+adc_low_period);
@@ -837,7 +770,6 @@ module top_main #
             {ADDR, CLKADCSW, CLKADC} <= 0;
             {DACBL_SW2, DACSEL_SW, DACWL_SW}<=0;
         end else begin
-
             if (cnt_adc_first_delay == adc_first_delay) begin
                 cnt <= cnt + (i_phase==adc_high_period+adc_low_period);
                 i_phase <= (i_phase + 1) % (1 + adc_high_period + adc_low_period);
@@ -853,8 +785,8 @@ module top_main #
             CLKADCSW <= 1'b1;
             // The side switches
             DACBL_SW2 <= 1'b1;
-            DACWL_SW <= 1'b1;
             DACSEL_SW <= 1'b1;
+            DACWL_SW <= 1'b1;
         end
     end
     endtask

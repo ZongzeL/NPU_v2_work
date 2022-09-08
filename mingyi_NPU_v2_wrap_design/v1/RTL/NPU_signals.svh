@@ -15,32 +15,15 @@ end
 endtask
 //}}}
 
-task NPU_CLKADC_w_gen ();
-//{{{
-begin
-    if (dac_adc_internal_state >= READADC_INTERNAL_VALID_STATE_ST && 
-        dac_adc_internal_state <= READADC_INTERNAL_VALID_STATE_END) begin 
-        CLKADC_w          = 1'b1;
-    end
-    else begin
-        CLKADC_w          = 1'b0;
-    end
-end
-endtask
-//}}}
-
 always @(CS
         or dac_config_run_addr
         or dac_adc_internal_state
         or SETDAC_INTERNAL_VALID_STATE_ST
         or SETDAC_INTERNAL_VALID_STATE_END
-        or READADC_INTERNAL_VALID_STATE_ST
-        or READADC_INTERNAL_VALID_STATE_END
     ) begin
     ADDR_w        = 9'b0;
     DIN_w         = 8'b0;
     CLKDAC_w      = 1'b0;
-    CLKADC_w      = 1'b0;
     
     if (CS == DAC_CONFIG) begin //1
     //{{{
@@ -50,39 +33,61 @@ always @(CS
     end
     //}}}
     
-    else if (CS == DAC_SETRESET_WLBL_V) begin //2
+    else if (CS == DAC_SRREF_V) begin //2
     //{{{
         if (dac_config_run_addr == 0) begin
-            ADDR_w = 9'h1f9;
-            DIN_w  = set_bl_v; 
+            ADDR_w = 9'h1f8;
+            if (current_opt == RUN_SET) begin
+                DIN_w  = set_srref0;
+            end
+            else if (current_opt == RUN_RESET) begin
+                DIN_w  = reset_srref0;
+            end
+            else if (current_opt == RUN_READMEM) begin
+                DIN_w  = readmem_srref0;
+            end
+
             NPU_CLKDAC_w_gen();
         end
         else if (dac_config_run_addr == 1) begin
+            ADDR_w = 9'h1f9;
+            if (current_opt == RUN_SET) begin
+                DIN_w  = set_srref1;
+            end
+            else if (current_opt == RUN_RESET) begin
+                DIN_w  = reset_srref1;
+            end
+            else if (current_opt == RUN_READMEM) begin
+                DIN_w  = readmem_srref1;
+            end
+            NPU_CLKDAC_w_gen();
+        end
+        else if (dac_config_run_addr == 2) begin
             ADDR_w = 9'h1fa;
-            DIN_w  = reset_wl_v; 
+            if (current_opt == RUN_SET) begin
+                DIN_w  = set_srref2;
+            end
+            else if (current_opt == RUN_RESET) begin
+                DIN_w  = reset_srref2;
+            end
+            else if (current_opt == RUN_READMEM) begin
+                DIN_w  = readmem_srref2;
+            end
             NPU_CLKDAC_w_gen();
         end
 
     end
     //}}}
-    
-    else if (CS == DAC_SETRESET_SEL_V) begin //4
-    //{{{
-        ADDR_w = 9'h1f8;
-        if (current_opt == RUN_RESET) begin
-            DIN_w = reset_sel_v;
+
+    else if (CS == APPLY_V) begin
+        if (current_opt == RUN_READMEM) begin
+            ADDR_w = L2_bl_pos;
         end
-        else if (current_opt == RUN_SET) begin
-            DIN_w = set_sel_v;
-        end
-        NPU_CLKDAC_w_gen();
     end
-    //}}}
 
     else if (CS == ADC_KERNEL) begin //8
     //{{{
-        ADDR_w = L3_bl_pos;
-        NPU_CLKADC_w_gen();
+        ADDR_w = L2_bl_pos;
     end
     //}}}
     
@@ -90,7 +95,6 @@ always @(CS
         ADDR_w        = 9'b0;
         DIN_w         = 8'b0;
         CLKDAC_w      = 1'b0;
-        CLKADC_w      = 1'b0;
     end
 end
 
@@ -106,6 +110,46 @@ always @( posedge clk or negedge rst_n) begin
         CLKDAC  <= CLKDAC_w  ;
     end
 end
+//}}}
+
+//CLKADCSW, CLKADC
+//{{{
+/*
+always @(CS
+        or adc_first_delay
+        or adc_high_delay
+        or adc_low_delay
+        or dac_adc_internal_state
+    ) begin
+*/
+always @(*)begin
+    CLKADC_w      = 1'b0;
+    CLKADCSW_w      = 1'b0;
+    if (CS == APPLY_V) begin
+        if (current_opt == RUN_READMEM) begin
+            CLKADCSW_w      = 1'b1;
+        end
+    end   
+ 
+    else if (CS == ADC_KERNEL) begin //8
+    //{{{
+        CLKADCSW_w      = 1'b1;
+        if (dac_adc_internal_state >= 0 && 
+            dac_adc_internal_state <= adc_high_delay) begin 
+            CLKADC_w          = 1'b1;
+        end
+        else if (dac_adc_internal_state > adc_high_delay && 
+            dac_adc_internal_state <= adc_high_delay + adc_low_delay) begin 
+            CLKADC_w          = 1'b0;
+        end
+    end
+    //}}}
+    
+    else begin
+        CLKADC_w      = 1'b0;
+        CLKADCSW_w      = 1'b0;
+    end
+end
 
 always @( posedge clk or negedge rst_n) begin
     if (rst_n == 1'b0) begin
@@ -113,12 +157,11 @@ always @( posedge clk or negedge rst_n) begin
         CLKADC      <= 1'b0;
     end
     else begin
-        CLKADCSW    <= CLKADC_w      ;
+        CLKADCSW    <= CLKADCSW_w      ;
         CLKADC      <= CLKADC_w      ;
     end
 end
 //}}}
-
 
 //CLKREG_(SEL/BL/WL/TIA) ,  DINSWREG_(SEL/BL/WL/TIA)
 //{{{
@@ -135,25 +178,48 @@ always @(*) begin
     else begin
 
         //if run readmem, need to open this
-        DINSWREG_TIA_w = 1'b0;
 
 
-        //WL
-        if ((WLBL_LENGTH - 1 - setsw_count[8:1]) == L2_wl_pos) begin
+        //WL 0: 用wl，cnt = 0 开255
+        if ((WLBL_LENGTH - 1 - setsw_count[8:1]) == L3_wl_pos) begin
             DINSWREG_WL_w = 1'b1;
         end
         else begin
             DINSWREG_WL_w = 1'b0;
         end
         
-        //BL
-        if ((WLBL_LENGTH - 1 - setsw_count[8:1]) == L3_bl_pos) begin
-            DINSWREG_BL_w  = 1'b1;
-            DINSWREG_SEL_w = 1'b1;
+        //BL 1: 用bl，cnt =0 开255
+        if (current_opt == RUN_SET || current_opt == RUN_RESET) begin
+            if ((WLBL_LENGTH - 1 - setsw_count[8:1]) == L2_bl_pos) begin
+                DINSWREG_BL_w  = 1'b1;
+            end
+            else begin
+                DINSWREG_BL_w  = 1'b0;
+            end
         end
         else begin
             DINSWREG_BL_w  = 1'b0;
+        end
+
+        //SEL 2: 用wl，cnt = 0 开0
+        if (setsw_count[8:1] == L3_wl_pos) begin
+            DINSWREG_SEL_w = 1'b1;
+        end
+        else begin
             DINSWREG_SEL_w = 1'b0;
+        end
+
+        //TIA 3: 用bl，cnt = 0 开0
+        if (current_opt == RUN_READMEM) begin
+            if (setsw_count[8:1] == L2_bl_pos) begin
+                DINSWREG_TIA_w = 1'b1;
+            end
+            else begin
+                DINSWREG_TIA_w = 1'b0;
+            end
+        end
+        else begin
+            DINSWREG_TIA_w = 1'b0;
         end
 
         //CLKREG
@@ -173,10 +239,14 @@ always @( posedge clk or negedge rst_n) begin
         DACWLREFSW    <= 0;
     end
     else begin
+        //0: wl
+        //1: bl
+        //2: sel
+        //3:tia
         DINSWREG[0:0] <= DINSWREG_WL_w  ;
-        DINSWREG[1:1] <= DINSWREG_SEL_w ;			
-        DINSWREG[2:2] <= DINSWREG_TIA_w ;	
-        DINSWREG[3:3] <= DINSWREG_BL_w  ;
+        DINSWREG[1:1] <= DINSWREG_BL_w ;			
+        DINSWREG[2:2] <= DINSWREG_SEL_w ;	
+        DINSWREG[3:3] <= DINSWREG_TIA_w  ;
         CLKREG[0:0]   <= CLKREG_w       ;
         CLKREG[1:1]   <= CLKREG_w       ;
         CLKREG[2:2]   <= CLKREG_w       ;	

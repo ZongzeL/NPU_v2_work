@@ -1,0 +1,2 @@
+Time:                    1 ns: sim start
+Time:                50001 ns: sim end

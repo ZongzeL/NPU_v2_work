@@ -89,6 +89,9 @@ module NPU_v2_wrap_mingyi_gen #
 
     //}}}
 
+    output wire [3:0] CS_ILA,
+    output wire [15:0] dac_adc_internal_state_ILA,
+
     //NPU v2 signals
     //{{{ 
     input wire [5:0] DOUT,
@@ -115,7 +118,8 @@ module NPU_v2_wrap_mingyi_gen #
     output wire ASET_ENREG,
     output wire ASET_WLREG   
     //}}}
-    
+   
+     
 
 ); 
 
@@ -127,14 +131,12 @@ module NPU_v2_wrap_mingyi_gen #
     //localparam
     localparam IDLE = 4'b0;
     localparam DAC_CONFIG = 4'd1;
-    localparam DAC_SETRESET_WLBL_V = 4'd2;
+    localparam DAC_SRREF_V = 4'd2;
     localparam START = 4'd3; //single point single opt start
-    localparam DAC_SETRESET_SEL_V = 4'd4;
     localparam SETSW = 4'd5;
     localparam APPLY_V = 4'd6;
     localparam FINISH = 4'd7; //single point single opt finish
     localparam ADC_KERNEL = 4'd8; 
-    
 
 
  
@@ -300,16 +302,11 @@ module NPU_v2_wrap_mingyi_gen #
     wire [3:0]              SETDAC_INTERNAL_VALID_STATE_ST; //which state rise DAC
     wire [3:0]              SETDAC_INTERNAL_VALID_STATE_END; //which state rise DAC
 
-    wire [3:0]              READADC_INTERNAL_STATE_LIMIT;
-    wire [3:0]              READADC_INTERNAL_VALID_STATE_ST; //which state rise ADC
-    wire [3:0]              READADC_INTERNAL_VALID_STATE_END; //which state rise ADC
     
     //13 
-    wire [7:0]  set_sel_v; 
-    wire [7:0]  reset_sel_v;
-        //sel_v write to 1f8    
-    wire [7:0]  reset_wl_v; //reset, use wl_v, write to 1f9
-    wire [7:0]  set_bl_v; //set, use bl_v, write to 1fa
+    wire [7:0]  reset_srref0; //1f8
+    wire [7:0]  reset_srref1; //1f9
+    wire [7:0]  reset_srref2; //1fa
 
     //14
     wire [1:0] single_point_opt_list[7:0]; //SET, RESET, READMEM, use two bits
@@ -324,13 +321,27 @@ module NPU_v2_wrap_mingyi_gen #
   
     //17 
     wire [15:0] NPU_WRAP_readmem_pulse_width;
-    wire [3: 0] READ_MEM_repeat_time; 
+    wire [15:0] NPU_WRAP_BL_pulsewidth_readmem_st;
+    
     //18
     wire [15:0] NPU_WRAP_WL_pulsewidth_readmem_st;
     wire [15:0] NPU_WRAP_SEL_pulsewidth_readmem_st;
+    
     //19
-    wire [15:0] NPU_WRAP_BL_pulsewidth_readmem_st;
- 
+    wire [11:0] adc_first_delay;
+    wire [11:0] adc_high_delay;
+    wire [7:0]  adc_low_delay;
+
+    //20 
+    wire [7:0]  set_srref0; //1f8
+    wire [7:0]  set_srref1; //1f9
+    wire [7:0]  set_srref2; //1fa
+    
+    //21 
+    wire [7:0]  readmem_srref0; //1f8
+    wire [7:0]  readmem_srref1; //1f9
+    wire [7:0]  readmem_srref2; //1fa
+
 
     //}}}
 
@@ -356,7 +367,7 @@ module NPU_v2_wrap_mingyi_gen #
     reg [15:0] pulse_count;
 
 
-    reg [3:0] dac_adc_internal_state;    
+    reg [15:0] dac_adc_internal_state;    
     reg [7:0] dac_config_run_addr;
     reg [7:0] dac_config_end_addr;
     reg [3:0] readmem_adc_count;
@@ -394,6 +405,8 @@ module NPU_v2_wrap_mingyi_gen #
     assign start_trigger[2:0] = NPU_WRAP_control[0][2:0];
     assign stop_trigger = NPU_WRAP_control[1][0:0];
 
+    assign CS_ILA[3:0] = CS[3:0];
+    assign dac_adc_internal_state_ILA[15:0] = dac_adc_internal_state[15:0];
  
     //assign
     //{{{ 
@@ -449,15 +462,10 @@ module NPU_v2_wrap_mingyi_gen #
     assign SETDAC_INTERNAL_VALID_STATE_ST   = NPU_WRAP_config[12][7 : 4]; 
     assign SETDAC_INTERNAL_VALID_STATE_END  = NPU_WRAP_config[12][11: 8]; 
 
-    assign READADC_INTERNAL_STATE_LIMIT     = NPU_WRAP_config[12][19:16];
-    assign READADC_INTERNAL_VALID_STATE_ST  = NPU_WRAP_config[12][23:20]; 
-    assign READADC_INTERNAL_VALID_STATE_END = NPU_WRAP_config[12][27:24]; 
-
     //13
-    assign set_sel_v                        = NPU_WRAP_config[13][7:0];
-    assign reset_sel_v                      = NPU_WRAP_config[13][15:8];
-    assign reset_wl_v                       = NPU_WRAP_config[13][23:16];
-    assign set_bl_v                         = NPU_WRAP_config[13][31:24];
+    assign reset_srref0                      = NPU_WRAP_config[13][7:0];
+    assign reset_srref1                       = NPU_WRAP_config[13][15:8];
+    assign reset_srref2                       = NPU_WRAP_config[13][23:16];
 
 
     //14
@@ -480,13 +488,25 @@ module NPU_v2_wrap_mingyi_gen #
     assign L4_whole_range_loop              = NPU_WRAP_config[16][31:0];
     
     //17
-    assign NPU_WRAP_readmem_pulse_width     = NPU_WRAP_config[17][15: 0];
-    assign READ_MEM_repeat_time             = NPU_WRAP_config[17][19:16]; 
+    assign NPU_WRAP_readmem_pulse_width[15:0] = (NPU_WRAP_config[17][15: 0] > NPU_WRAP_config[19][31:20]) ? NPU_WRAP_config[17][15: 0] : NPU_WRAP_config[19][31:20];
+    assign NPU_WRAP_BL_pulsewidth_readmem_st= NPU_WRAP_config[17][31:16];
     //18
     assign NPU_WRAP_WL_pulsewidth_readmem_st    = NPU_WRAP_config[18][15:0];
     assign NPU_WRAP_SEL_pulsewidth_readmem_st   = NPU_WRAP_config[18][31:16];
     //19
-    assign NPU_WRAP_BL_pulsewidth_readmem_st    = NPU_WRAP_config[19][15:0];
+    assign adc_first_delay                 = NPU_WRAP_config[19][31:20];
+    assign adc_high_delay                  = NPU_WRAP_config[19][19:8];
+    assign adc_low_delay                   = NPU_WRAP_config[19][7:0];
+    //20
+    assign set_srref0                       = NPU_WRAP_config[20][7:0];
+    assign set_srref1                       = NPU_WRAP_config[20][15:8];
+    assign set_srref2                       = NPU_WRAP_config[20][23:16];
+    //21
+    assign readmem_srref0                   = NPU_WRAP_config[21][7:0];
+    assign readmem_srref1                   = NPU_WRAP_config[21][15:8];
+    assign readmem_srref2                   = NPU_WRAP_config[21][23:16];
+
+
     //}}}
 
 

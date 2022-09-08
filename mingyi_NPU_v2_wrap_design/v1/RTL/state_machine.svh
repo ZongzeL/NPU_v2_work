@@ -61,7 +61,7 @@ begin
                     if (dac_config_run_addr == dac_config_end_addr) begin
                         dac_config_end_addr <= 8'd0;
                         dac_config_run_addr <= 8'd0;
-                        CS <= DAC_SETRESET_WLBL_V;
+                        CS <= IDLE;
                     end
                     else begin
                         dac_config_run_addr <= dac_config_run_addr + 8'd1;
@@ -73,19 +73,20 @@ begin
             end
             //}}} 
             
-            DAC_SETRESET_WLBL_V: begin //2
+            DAC_SRREF_V: begin //2
             //{{{
                 if (dac_adc_internal_state == SETDAC_INTERNAL_STATE_LIMIT) begin 
-                    if (dac_config_run_addr == 8'd1) begin //write 2, reset_bl and set_wl
+                    if (dac_config_run_addr == 8'd2) begin 
                         dac_config_run_addr <= 8'd0;
-                        CS <= IDLE;
+                        //CS <= APPLY_V;
+                        CS <= SETSW;
                     end
                     else begin
                         dac_config_run_addr <= dac_config_run_addr + 8'd1;
                     end
                 end 
                 else begin
-                    CS <= DAC_SETRESET_WLBL_V;
+                    CS <= DAC_SRREF_V;
                 end
             end
             //}}}
@@ -94,40 +95,24 @@ begin
             //{{{
                 //L0_single_point_opt_loop_pos is stable, current_opt is also stable. 
                 dac_config_run_addr <= 8'd0; //dac_run_addr must reset every time start!
-                if (current_opt == RUN_SET || current_opt == RUN_RESET) begin
-                    CS <= DAC_SETRESET_SEL_V;
-                end
-                else begin
-                    //READMEM
-                    CS <= SETSW; 
+                //CS <= SETSW;
+                CS <= DAC_SRREF_V;
+
+                if (
+                    ((last_opt == RUN_SET || last_opt == RUN_RESET) && current_opt == RUN_READMEM ) ||
+                    ((current_opt == RUN_SET || current_opt == RUN_RESET) && last_opt == RUN_READMEM)
+                ) begin
+                    //last is set reset, this is readmem, or opposite situation, need to rerun sw to open tia and bl
+                    CS_PASS[SETSW:SETSW] <= 1'b0; 
                 end
             end 
             //}}}
 
-            DAC_SETRESET_SEL_V: begin //4
-            //{{{
-                if (CS_PASS[DAC_SETRESET_SEL_V:DAC_SETRESET_SEL_V] == 1'b1 && last_opt == current_opt) begin
-                    //skip
-                    CS <= SETSW;
-                end
-                else begin
-                    //running
-                    if (dac_adc_internal_state == SETDAC_INTERNAL_STATE_LIMIT) begin 
-                        //write only one, sel_v
-                        CS <= SETSW;
-                        CS_PASS[DAC_SETRESET_SEL_V:DAC_SETRESET_SEL_V] <= 1'b1;
-                    end 
-                    else begin
-                        CS <= DAC_SETRESET_SEL_V;
-                    end
-                end
-            end
-            //}}}
-           
             SETSW: begin //5
             //{{{
                 if (CS_PASS[SETSW:SETSW] == 1'b1) begin
                     //skip
+                    //CS <= DAC_SRREF_V;
                     CS <= APPLY_V;
                 end 
                 else begin
@@ -171,15 +156,10 @@ begin
 
             ADC_KERNEL: begin //8
             //{{{
-                if (dac_adc_internal_state == READADC_INTERNAL_STATE_LIMIT) begin
-                    if (readmem_adc_count == READ_MEM_repeat_time) begin
-                        CS <= FINISH; 
-                        CS_PASS[ADC_KERNEL : ADC_KERNEL] <= 1'b1;
-                        readmem_adc_count <= 8'd0;
-                    end
-                    else begin
-                        readmem_adc_count <= readmem_adc_count + 8'd1;
-                    end
+                if (dac_adc_internal_state == adc_high_delay + adc_low_delay) begin
+                    CS <= FINISH; 
+                    CS_PASS[ADC_KERNEL : ADC_KERNEL] <= 1'b1;
+                    readmem_adc_count <= 8'd0;
                 end
                 else begin
                     CS <= ADC_KERNEL;
@@ -258,47 +238,32 @@ end
 always @( posedge clk) begin
     if (
         CS == DAC_CONFIG || 
-        CS == DAC_SETRESET_WLBL_V ||
-        CS == DAC_SETRESET_SEL_V
+        CS == DAC_SRREF_V
     ) begin
         if (dac_adc_internal_state != SETDAC_INTERNAL_STATE_LIMIT) begin 
             dac_adc_internal_state <= dac_adc_internal_state + 1'b1;
         end 
         else begin
-            dac_adc_internal_state <= 4'b0;
-        end
-    end
-    else if (
-        CS == DAC_SETRESET_SEL_V
-    ) begin
-        if (
-            dac_adc_internal_state != SETDAC_INTERNAL_STATE_LIMIT && 
-            CS_PASS[DAC_SETRESET_SEL_V:DAC_SETRESET_SEL_V] == 0
-        ) begin 
-            dac_adc_internal_state <= dac_adc_internal_state + 1'b1;
-        end 
-        else begin
-            //if skip, do not count it
-            dac_adc_internal_state <= 4'b0;
+            dac_adc_internal_state <= 16'b0;
         end
     end
     else if (
         CS == ADC_KERNEL 
     ) begin
         if (
-            dac_adc_internal_state != READADC_INTERNAL_STATE_LIMIT 
+            dac_adc_internal_state != adc_high_delay + adc_low_delay
         ) begin 
             dac_adc_internal_state <= dac_adc_internal_state + 1'b1;
         end 
         else begin
             //if skip, do not count it
-            dac_adc_internal_state <= 4'b0;
+            dac_adc_internal_state <= 16'b0;
         end
     end
 
     else begin   
         //do not need to consider reset, keep 0 except the states above. 
-        dac_adc_internal_state <= 4'b0;
+        dac_adc_internal_state <= 16'b0;
     end 
 end
 //}}}
