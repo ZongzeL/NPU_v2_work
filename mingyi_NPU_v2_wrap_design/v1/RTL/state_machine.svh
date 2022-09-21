@@ -18,7 +18,6 @@ begin
         L4_whole_range_loop_pos <= 32'b0;
         dac_config_run_addr <= 8'd0;
         dac_config_end_addr <= 8'd0;
-        readmem_adc_count <= 4'd0;
         last_opt <= 8'd0;
     end
     else begin
@@ -156,13 +155,24 @@ begin
 
             ADC_KERNEL: begin //8
             //{{{
-                if (dac_adc_internal_state == adc_high_delay + adc_low_delay) begin
-                    CS <= FINISH; 
+                if (dac_adc_internal_state == adc_high_delay) begin
+                    CS <= ADC_POST; 
                     CS_PASS[ADC_KERNEL : ADC_KERNEL] <= 1'b1;
-                    readmem_adc_count <= 8'd0;
                 end
                 else begin
                     CS <= ADC_KERNEL;
+                end
+            end
+            //}}}
+            
+            ADC_POST: begin //8
+            //{{{
+                if (dac_adc_internal_state == adc_low_delay) begin
+                    CS <= FINISH; 
+                    CS_PASS[ADC_POST : ADC_POST] <= 1'b1;
+                end
+                else begin
+                    CS <= ADC_POST;
                 end
             end
             //}}}
@@ -226,7 +236,6 @@ begin
                 L4_whole_range_loop_pos <= 32'b0;
                 dac_config_run_addr <= 8'd0;
                 dac_config_end_addr <= 8'd0;
-                readmem_adc_count <= 4'd0;
             end
         endcase 
     end
@@ -251,7 +260,20 @@ always @( posedge clk) begin
         CS == ADC_KERNEL 
     ) begin
         if (
-            dac_adc_internal_state != adc_high_delay + adc_low_delay
+            dac_adc_internal_state != adc_high_delay
+        ) begin 
+            dac_adc_internal_state <= dac_adc_internal_state + 1'b1;
+        end 
+        else begin
+            //if skip, do not count it
+            dac_adc_internal_state <= 16'b0;
+        end
+    end
+    else if (
+        CS == ADC_POST 
+    ) begin
+        if (
+            dac_adc_internal_state != adc_low_delay
         ) begin 
             dac_adc_internal_state <= dac_adc_internal_state + 1'b1;
         end 

@@ -137,6 +137,7 @@ module NPU_v2_wrap_mingyi_gen #
     localparam APPLY_V = 4'd6;
     localparam FINISH = 4'd7; //single point single opt finish
     localparam ADC_KERNEL = 4'd8; 
+    localparam ADC_POST = 4'd9; 
 
 
  
@@ -341,7 +342,7 @@ module NPU_v2_wrap_mingyi_gen #
     wire [7:0]  readmem_srref0; //1f8
     wire [7:0]  readmem_srref1; //1f9
     wire [7:0]  readmem_srref2; //1fa
-
+    wire [7:0]  NPU_WRAP_SEL_pulsewidth_readmem_end;
 
     //}}}
 
@@ -370,7 +371,6 @@ module NPU_v2_wrap_mingyi_gen #
     reg [15:0] dac_adc_internal_state;    
     reg [7:0] dac_config_run_addr;
     reg [7:0] dac_config_end_addr;
-    reg [3:0] readmem_adc_count;
  
     //config
     reg [AXI_DATA_WIDTH - 1 : 0] NPU_WRAP_config [CONFIG_LENGTH - 1 : 0];
@@ -505,6 +505,7 @@ module NPU_v2_wrap_mingyi_gen #
     assign readmem_srref0                   = NPU_WRAP_config[21][7:0];
     assign readmem_srref1                   = NPU_WRAP_config[21][15:8];
     assign readmem_srref2                   = NPU_WRAP_config[21][23:16];
+    assign NPU_WRAP_SEL_pulsewidth_readmem_end = NPU_WRAP_config[21][31:24];
 
 
     //}}}

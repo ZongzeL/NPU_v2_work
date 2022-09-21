@@ -373,14 +373,14 @@ begin
     input_list[8][31:16] = 'd14;//NPU_WRAP_BL_pulsewidth_set_end
 
     //9
-    input_list[9][15: 0] = 'd11; //NPU_WRAP_WL_pulsewidth_reset_st
-    input_list[9][31:16] = 'd28;//NPU_WRAP_WL_pulsewidth_reset_end
+    input_list[9][15: 0] = 'd2; //NPU_WRAP_WL_pulsewidth_reset_st
+    input_list[9][31:16] = 'd38;//NPU_WRAP_WL_pulsewidth_reset_end
     //10
-    input_list[10][15: 0] = 'd13; //NPU_WRAP_SEL_pulsewidth_reset_st
-    input_list[10][31:16] = 'd26;//NPU_WRAP_SEL_pulsewidth_reset_end
+    input_list[10][15: 0] = 'd5; //NPU_WRAP_SEL_pulsewidth_reset_st
+    input_list[10][31:16] = 'd37;//NPU_WRAP_SEL_pulsewidth_reset_end
     //11
-    input_list[11][15: 0] = 'd15; //NPU_WRAP_BL_pulsewidth_reset_st
-    input_list[11][31:16] = 'd24;//NPU_WRAP_BL_pulsewidth_reset_end
+    input_list[11][15: 0] = 'd8; //NPU_WRAP_BL_pulsewidth_reset_st
+    input_list[11][31:16] = 'd34;//NPU_WRAP_BL_pulsewidth_reset_end
 
     //12
     input_list[12][3 : 0] = 4'd5;     //SETDAC_INTERNAL_STATE_LIMIT
@@ -393,12 +393,13 @@ begin
     input_list[13][23:16] = 8'hf3; //reset_srref2
 
     //14
+    //0: set 1: reset 2: readmem
     //input_list[14][1 : 0] = 2'h1; //RUN_RESET
-    input_list[14][1 : 0] = 2'h0; //RUN_RESET
-    input_list[14][3 : 2] = 2'h2; //RUN_SET
-    input_list[14][5 : 4] = 2'h1; //READMEM
+    input_list[14][1 : 0] = 2'h1; 
+    input_list[14][3 : 2] = 2'h0; 
+    input_list[14][5 : 4] = 2'h2; 
     //input_list[14][7 : 6] = 2'h2; 
-    input_list[14][18:16] = 3'd2; //L0_single_point_opt_loop
+    input_list[14][18:16] = 3'd0; //L0_single_point_opt_loop
 
     //15
     input_list[15][31: 0] = L1_single_point_loop;

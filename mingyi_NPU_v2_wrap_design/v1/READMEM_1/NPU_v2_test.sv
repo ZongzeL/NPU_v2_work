@@ -404,15 +404,15 @@ begin
     
     //17
     input_list[17][15: 0] = 16'd19;//NPU_WRAP_readmem_pulse_width
-    input_list[17][31:16] = 16'd0; //NPU_WRAP_BL_pulsewidth_readmem_st
+    input_list[17][31:16] = 16'd6; //NPU_WRAP_BL_pulsewidth_readmem_st
     //18
-    input_list[18][15: 0] = 16'd0; //NPU_WRAP_WL_pulsewidth_readmem_st
-    input_list[18][31:16] = 16'd0; //NPU_WRAP_SEL_pulsewidth_readmem_st
+    input_list[18][15: 0] = 16'd4; //NPU_WRAP_WL_pulsewidth_readmem_st
+    input_list[18][31:16] = 16'd2; //NPU_WRAP_SEL_pulsewidth_readmem_st
     
     //19
     input_list[19][31:20] = 8'd50; //adc_first_delay
     input_list[19][19: 8] = 8'd30; //adc_high_delay
-    input_list[19][7 : 0] = 8'd10; //adc_low_delay
+    input_list[19][7 : 0] = 8'd4; //adc_low_delay
     
     //input_list[19][31:0] = 32'h10e00a00; //default, comment this to switch different values
 
@@ -424,6 +424,7 @@ begin
     input_list[21][7 : 0] = 8'hd1; //readmem_srref0
     input_list[21][15: 8] = 8'hd2; //readmem_srref1
     input_list[21][23:16] = 8'hd3; //readmem_srref2
+    input_list[21][31:24] = 8'd3;  //NPU_WRAP_SEL_pulsewidth_readmem_end
     
  
     write_addr[9:8] = 2'd2;

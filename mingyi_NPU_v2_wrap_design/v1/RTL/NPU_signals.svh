@@ -285,7 +285,7 @@ always @(*) begin
             else begin
                 DACWL_SW_w    = 0;
             end
-            //BL
+            //SEL
             if (pulse_count >= NPU_WRAP_SEL_pulsewidth_set_st &&
                 pulse_count <= NPU_WRAP_SEL_pulsewidth_set_end
             ) begin 
@@ -317,7 +317,7 @@ always @(*) begin
             else begin
                 DACWL_SW_w    = 0;
             end
-            //BL
+            //SEL
             if (pulse_count >= NPU_WRAP_SEL_pulsewidth_reset_st &&
                 pulse_count <= NPU_WRAP_SEL_pulsewidth_reset_end
             ) begin 
@@ -360,6 +360,18 @@ always @(*) begin
         DACBL_SW2_w   = 1;
         DACSEL_SW_w   = 1;
         DACWL_SW_w    = 1;
+    end
+    else if (CS == ADC_POST) begin
+        DACBL_SW_w    = 0;
+        DACBL_SW2_w   = 1;
+        DACWL_SW_w    = 1;
+        
+        if (dac_adc_internal_state <= NPU_WRAP_SEL_pulsewidth_readmem_end) begin
+            DACSEL_SW_w   = 1;
+        end
+        else begin
+            DACSEL_SW_w   = 0;
+        end
     end
     else begin
         DACBL_SW_w    = 0;

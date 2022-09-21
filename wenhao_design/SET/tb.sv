@@ -1,3 +1,10 @@
+///home/ares/TM_work/NPU_mainboard_work/NPU_controller_design_work/NPU_single_BGA_controller_sim
+/*
+看这个case，这个是文豪的最早的tb。如果不知道该怎么做，看它来面壁说不定能找到灵感。
+
+
+
+*/
 
 longint unsigned ns_counter;
 longint unsigned clock_counter;
@@ -44,13 +51,15 @@ module top_main_tb(
     string tmp;
     string s;
 
-    reg [C_M00_AXI_DATA_WIDTH-1:0] mode_sel = MODE_VMM;
+    //reg [C_M00_AXI_DATA_WIDTH-1:0] mode_sel = MODE_VMM;
+    reg [C_M00_AXI_DATA_WIDTH-1:0] mode_sel = MODE_SETRESET;
     //reg [C_M00_AXI_DATA_WIDTH-1:0] mode_sel = MODE_READ;
     reg resetn;//in
     reg clk = 1'b0;//in
     
     bit [5:0] all_input_list [32][32];
     
+    bit [5:0] input_list [256];
 
     // NPU IOs
     //{{{
@@ -298,6 +307,7 @@ initial begin //this is INITIAL_OUT
     int BL_start = 0;
     int BL_end = 10;
 
+    bit [15:0] tmp;
 
     int i, j;
     int CAL_WL = WL_end - WL_start;
@@ -317,19 +327,50 @@ initial begin //this is INITIAL_OUT
 
     axi_lite_slave_driver.WRITE_Q_VALUES_TASK (Q_INTERVAL - 100, Q_DEDUCT);
     axi_lite_slave_driver.WRITE_ARGUMENTS_TASK(mode_sel, WL_start, WL_end, BL_start, BL_end, 0);
+
+    input_list[0] = 2'b01;
+    input_list[11] = 6'b111000;
+
+
+
+
+
     @(posedge clk);
-    for (i = 0; i < 900; i ++) begin
+    for (i = 0; i < 90; i ++) begin
         //this wait time should be read from waveform
         @(posedge clk); //#(9000);
     end
 
+    tmp[15:14] = 2'b01; //set
+    tmp[13:8] = 6'h3e;
+    tmp[5:0] = 6'h2a;
+
+
     /*
-    for (int round = 0; round < BATCH_SIZE_VMM; round ++) begin
-        $display ("test round: %d", round);
-        //one_round_vmm_loop(round, WL_start, WL_end, BL_start, BL_end);
-        one_round_vmm_file(round, WL_start, WL_end, BL_start, BL_end);
+    文豪的set/reset并不复杂，
+    首先axi lite起一个start
+    然后dac写config，要等几十个cycle来等它的data receive state
+    等到了状态，开始写256个stream slave，每个代表一个i_wl.
+    这个写stream slave, 用一个16bit，15：14是mode，13：8是srref0，5：0是srref1或2
+    只要RTL那边看见stream的tlast就开始动状态机
+
+
+    */ 
+
+    @(posedge clk);
+    for (i = 0; i <= 254; i ++) begin
+        axi_stream_slave_driver.WRITE_DATA(tmp, 4'hf, 0); //1
+        @(posedge clk); 
     end
-    */
+    axi_stream_slave_driver.WRITE_DATA(tmp, 4'hf, 1); //11
+    @(posedge clk);
+    axi_stream_slave_driver.WRITE_DATA_ZERO();
+    @(posedge clk);
+
+
+
+
+
 end
 
 
